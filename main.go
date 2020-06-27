@@ -11,11 +11,13 @@ import (
 )
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
+	//有个现像，当url为：localhost:8888时，会出现多个报错信息，说明go的listen是一个连接对应多个请求
 	if r.URL.Path == "/" {
 		fmt.Fprintln(w, "Bastion is up ")
 		return
 	}
 	r.URL = calculateURL(r)
+	//若新URL的HOST为空则直接返回结束进程
 	if r.URL.Host == "" {
 		log.Println("Requesting nothing")
 		return
@@ -37,6 +39,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	io.Copy(w, resp.Body)
 }
 
+//得到转发的HTTP头部
 func copyHeader(from http.Header, to http.ResponseWriter) {
 	toHeader := to.Header()
 	for k, vs := range from {
@@ -46,11 +49,14 @@ func copyHeader(from http.Header, to http.ResponseWriter) {
 	}
 }
 
+//得到通过代理重定向访问的url
 func calculateURL(r *http.Request) *url.URL {
 	newURL := *r.URL
 	oldPath := r.URL.Path
 	oldPathParts := strings.Split(oldPath, "/")[1:]
 	log.Println("This is oldPath:", oldPath, strings.Split(oldPath, "/"), oldPathParts, len(oldPathParts))
+	//之前的代码没有这个判断，但是在浏览器访问时会有数组溢出报错信息
+	//排错得知是在字符串切割后并没有进行数组长度的判断，会使程序异常
 	if len(oldPathParts) <= 1 {
 		log.Println("The URL is too short ")
 		newURL.Host = ""
@@ -67,13 +73,19 @@ func calculateURL(r *http.Request) *url.URL {
 }
 
 func main() {
+	//定义一个命令行flag
+	//flag 名称:port 默认值：8888，提示信息：
 	var port = flag.Int("port", 8888, "port that micro-bastion should listen on")
 	flag.Parse()
 
+	//打印提示信息
 	log.Println("Starting micro-bastion on port", *port)
 
+	//注册http server服务
 	server := &http.Server{
-		Addr:              fmt.Sprint(":", *port),
+		//监听的host：port
+		Addr: fmt.Sprint(":", *port),
+		//进行强制类型转换，将handleRequest转换为HandlerFunc类型，进行路由注册
 		Handler:           http.HandlerFunc(handleRequest),
 		ReadTimeout:       0,
 		ReadHeaderTimeout: 0,
