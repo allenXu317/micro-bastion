@@ -12,6 +12,7 @@ import (
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
 	//有个现像，当url为：localhost:8888时，会出现多个报错信息，说明go的listen是一个连接对应多个请求
+    //所以我给提了个issue并且提出了修改得意见
 	if r.URL.Path == "/" {
 		fmt.Fprintln(w, "Bastion is up ")
 		return
@@ -24,6 +25,8 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	r.Host = r.URL.Host
 	log.Println("Requesting ", r.URL)
+    //发起请求
+    //开始转发
 	resp, err := http.DefaultTransport.RoundTrip(r)
 
 	if err != nil {
@@ -33,7 +36,9 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer resp.Body.Close()
-
+    
+    //写入相关得响应头、状态码、实体数据
+    //实现转发代理功能
 	copyHeader(resp.Header, w)
 	w.WriteHeader(resp.StatusCode)
 	io.Copy(w, resp.Body)
@@ -49,7 +54,7 @@ func copyHeader(from http.Header, to http.ResponseWriter) {
 	}
 }
 
-//得到通过代理重定向访问的url
+//得到需要代理访问的url
 func calculateURL(r *http.Request) *url.URL {
 	newURL := *r.URL
 	oldPath := r.URL.Path
